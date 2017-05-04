@@ -1,9 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
+using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using MyCodeCamp.Data;
 using MyCodeCamp.Data.Entities;
+using MyCodeCamp.Models;
 
 namespace MyCodeCamp.Controllers
 {
@@ -12,11 +15,16 @@ namespace MyCodeCamp.Controllers
     {
         private ICampRepository _repo;
         private ILogger<CampsController> _logger;
+        private IMapper _mapper;
 
-        public CampsController(ICampRepository repo, ILogger<CampsController> logger)
+        public CampsController(
+            ICampRepository repo, 
+            ILogger<CampsController> logger,
+            IMapper mapper)
         {
             _repo = repo;
             _logger = logger;
+            _mapper = mapper;
         }
 
         [HttpGet("")]
@@ -24,7 +32,7 @@ namespace MyCodeCamp.Controllers
         {
             var camps = _repo.GetAllCamps();
 
-            return Ok(camps);
+            return Ok(_mapper.Map<IEnumerable<CampModel>>(camps));
         }
 
         // If the param is not part of the attribute it will become a querystring and if given a default here will be optional in the web address
@@ -40,7 +48,7 @@ namespace MyCodeCamp.Controllers
 
                 if (camp == null) return NotFound($"Camp {id} was not found");
 
-                return Ok(camp);
+                return Ok(_mapper.Map<CampModel>(camp));
             }
             catch
             {
