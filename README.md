@@ -1,1 +1,3 @@
-# MyCodeCampe
+# MyCodeCamp
+
+Pluralsight course 
