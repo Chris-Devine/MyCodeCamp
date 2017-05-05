@@ -6,12 +6,14 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using MyCodeCamp.Data;
 using MyCodeCamp.Data.Entities;
+using MyCodeCamp.Filters;
 using MyCodeCamp.Models;
 
 namespace MyCodeCamp.Controllers
 {
     [Route("api/[controller]")]
-    public class CampsController : Controller
+    [ValidateModel]
+    public class CampsController : BaseController
     {
         private ICampRepository _repo;
         private ILogger<CampsController> _logger;
@@ -36,17 +38,17 @@ namespace MyCodeCamp.Controllers
         }
 
         // If the param is not part of the attribute it will become a querystring and if given a default here will be optional in the web address
-        [HttpGet("{id}", Name = "CampGet")]
-        public IActionResult Get(int id, bool includeSpeakers = false)
+        [HttpGet("{moniker}", Name = "CampGet")]
+        public IActionResult Get(string moniker, bool includeSpeakers = false)
         {
             try
             {
                 Camp camp = null;
 
-                if (includeSpeakers) camp = _repo.GetCampWithSpeakers(id);
-                else camp = _repo.GetCamp(id);
+                if (includeSpeakers) camp = _repo.GetCampByMonikerWithSpeakers(moniker);
+                else camp = _repo.GetCampByMoniker(moniker);
 
-                if (camp == null) return NotFound($"Camp {id} was not found");
+                if (camp == null) return NotFound($"Camp {moniker} was not found");
 
                 return Ok(_mapper.Map<CampModel>(camp));
             }
@@ -57,18 +59,20 @@ namespace MyCodeCamp.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> Post([FromBody]Camp model)
+        public async Task<IActionResult> Post([FromBody]CampModel model)
         {
             try
             {
                 _logger.LogInformation("Creating a new code camp");
 
-                _repo.Add(model);
+                var camp = _mapper.Map<Camp>(model);
+
+                _repo.Add(camp);
                 if (await _repo.SaveAllAsync())
                 {
-                    var newUri = Url.Link("CampGet", new {id = model.Id});
+                    var newUri = Url.Link("CampGet", new {moniker = camp.Moniker});
                     // model will now contain an id because its been saved to the DB
-                    return Created(newUri, model);
+                    return Created(newUri, _mapper.Map<CampModel>(camp));
                 }
                 else
                 {
@@ -82,26 +86,19 @@ namespace MyCodeCamp.Controllers
             return BadRequest();
         }
 
-        [HttpPut("id")]
-        public async Task<IActionResult> Put(int id, [FromBody]Camp model)
+        [HttpPut("moniker")]
+        public async Task<IActionResult> Put(string moniker, [FromBody]CampModel model)
         {
             try
             {
-                var oldCamp = _repo.GetCamp(id);
-                if (oldCamp == null) return NotFound($"Could not find a camp with the ID of {id}");
+                var oldCamp = _repo.GetCampByMoniker(moniker);
+                if (oldCamp == null) return NotFound($"Could not find a camp with the moniker of {moniker}");
 
-                // Map model to the oldcamp
-
-                oldCamp.Name = model.Name ?? oldCamp.Name;
-                oldCamp.Description = model.Description ?? oldCamp.Description;
-                oldCamp.Location = model.Location ?? oldCamp.Location;
-                oldCamp.Length = model.Length > 0 ? model.Length : oldCamp.Length;
-                oldCamp.EventDate = model.EventDate != DateTime.MinValue ? model.EventDate : oldCamp.EventDate;
-
+                _mapper.Map(model, oldCamp);
 
                 if (await _repo.SaveAllAsync())
                 {
-                    return Ok(oldCamp);
+                    return Ok(_mapper.Map<CampModel>(oldCamp));
                 }
             }
             catch (Exception e)
@@ -111,13 +108,13 @@ namespace MyCodeCamp.Controllers
             return BadRequest("Couldn't update Camp");
         }
 
-        [HttpDelete("id")]
-        public async Task<IActionResult> Delete(int id)
+        [HttpDelete("moniker")]
+        public async Task<IActionResult> Delete(string moniker)
         {
             try
             {
-                var oldCamp = _repo.GetCamp(id);
-                if (oldCamp == null) return NotFound($"Could not find camp with ID if {id}");
+                var oldCamp = _repo.GetCampByMoniker(moniker);
+                if (oldCamp == null) return NotFound($"Could not find camp with moniker if {moniker}");
 
                 _repo.Delete(oldCamp);
 
